@@ -59,4 +59,5 @@ with DAG(**default_settings()) as dag:
         bash_command='echo "Pipeline finished! Execution date is: {{ ds }}"'
     )
 
-    first_task >> create_titanic_dataset >> mean_fares_titanic_dataset >> pivot_titanic_dataset >> la
+    first_task >> create_titanic_dataset >> mean_fares_titanic_dataset >> pivot_titanic_dataset >> last_task
+   
