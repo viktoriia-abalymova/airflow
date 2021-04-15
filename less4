@@ -1,43 +1,67 @@
+from airflow import DAG
 import os
-#from airflow.operators.bash import BashOperator
+from airflow.hooks.base import BaseHook
+from airflow.models import Variable
+from airflow.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
+import datetime as dt
 import pandas as pd
 from airflow.decorators import dag, task
-from airflow.models import DAG, Variable
 from util.settings import default_settings
 
+default_args = {
+    'start_date': dt.datetime(2020, 12, 23)
+}
 @dag(**default_settings())
 def lesson4_dag():
 
-    @task
+    @task()
     def get_path(file_name):
         return os.path.join(os.path.expanduser('~'), file_name)
 
-    @task
-    def download_titanic_dataset():
+    @task()
+    def download_titanic_dataset(**context):
         url = 'https://web.stanford.edu/class/archive/cs/cs109/cs109.1166/stuff/titanic.csv'
         df = pd.read_csv(url)
-        df.to_csv(get_path('titanic.csv'), encoding='utf-8')
+        #df.to_csv(get_path('titanic.csv'), encoding='utf-8')
+        dt = df.to_json()
+        context['task_instance'].xcom_push(key='download_titanic_dataset', value=dt)
 
     @task()
-    def pivot_dataset():
+    def pivot_dataset(**context):
         titanic_df = pd.read_csv(get_path('titanic.csv'))
         df = titanic_df.pivot_table(index=['Sex'],
                                     columns=['Pclass'],
                                     values='Name',
                                     aggfunc='count').reset_index()
-        df.to_csv(get_path('titanic_pivot.csv'))
+        #df.to_csv(get_path('titanic_pivot.csv'))
+        dt = df.to_json()
+        context['task_instance'].xcom_push(key='pivot_dataset', value=dt)
 
     @task()
-    def mean_fare_per_class():
+    def mean_fare_per_class(**context):
         tt_df = pd.read_csv(get_path('titanic.csv'))
         df = tt_df.groupby('Pclass')['Fare'].mean()
-        df.to_csv(get_path('titanic_mean_fares.csv'))
+        #df.to_csv(get_path('titanic_mean_fares.csv'))
+        dt = df.to_json()
+        context['task_instance'].xcom_push(key='mean_fare_per_class', value=dt)
 
+    first_task = BashOperator(
+        task_id='first_task',
+        bash_command='echo "Here we start! Info: run_id={{ run_id }} | dag_run={{ dag_run }}"',
+    )
+
+    last_task = BashOperator(
+        task_id='last_task',
+        bash_command='echo "Pipeline finished! Execution date is {{ ds }}"',
+    )
 
     create_titanic_dataset = download_titanic_dataset()
     pivot_titanic_dataset = pivot_dataset(create_titanic_dataset)
     mean_fares_titanic_dataset = mean_fare_per_class(create_titanic_dataset)
 
-create_titanic_dataset >> mean_fares_titanic_dataset >> pivot_titanic_dataset
+    first_task >> create_titanic_dataset
+    mean_fares_titanic_dataset >> last_task
+    pivot_titanic_dataset >> last_task
 
 my_titanic_dag = lesson4_dag()
