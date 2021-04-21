@@ -38,4 +38,4 @@ with DAG(
     )
 
     # Порядок выполнения тасок
-first_task >> (create_titanic_dataset, mean_fares_titanic_dataset) >> pivot_titanic_dataset >> last_task
+first_task >> create_titanic_dataset >> mean_fares_titanic_dataset >> pivot_titanic_dataset >> last_task
